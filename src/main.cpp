@@ -61,11 +61,10 @@ void output(const char* data){
 }
 
 void output(float data){
+      char stringData[10];
+      sprintf(stringData, "%.2f", data);
 
-   char array[10];
-  sprintf(array, "%f", data);
-
-  output(array);
+      output(stringData);
 }
 
 void outputString(String data){
@@ -179,7 +178,7 @@ void loop() {
     display.setCursor(0, 0);
     output("Temperature = ");
     output(bme.readTemperature());
-    outputInfo(" *C", false);
+    outputInfo("*C", false);
 
     // display.setCursor(0, 24);
     // output("Pressure = ");
@@ -189,7 +188,7 @@ void loop() {
     display.setCursor(0, 24);
     output("Humidity = ");
     output(bme.readHumidity()); /* Adjusted to local forecast! */
-    outputInfo(" %", false);
+    outputInfo("%", false);
 
     outputInfo("", false); 
 
