@@ -5,6 +5,9 @@
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
+#include <Adafruit_BME280.h>
+#include <stdio.h>
+
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -17,43 +20,97 @@
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_BME280 bme; 
+
+int drawX = 0;
+
+void outputInfo(const char* data, bool refresh = true){
+  if(refresh == true){
+    display.clearDisplay();
+  }
+
+  Serial.println(data);
+  display.println(data);
+
+  if(refresh == true){
+    display.display();
+  }
+  //display.drawRect(10,10, 20,20, WHITE);
+}
+
+void outputStringInfo(String data){
+  int n = data.length();
+  char char_array[n + 1];
+  strcpy(char_array, data.c_str());
+
+  outputInfo(char_array);
+}
+
+
+
+void outputInfo(float data){
+   char array[10];
+  sprintf(array, "%f", data);
+
+  outputInfo(array);
+}
+
+void output(const char* data){
+    Serial.print(data);
+    display.print(data);
+}
+
+void output(float data){
+
+   char array[10];
+  sprintf(array, "%f", data);
+
+  output(array);
+}
+
+void outputString(String data){
+  int n = data.length();
+  char char_array[n + 1];
+  strcpy(char_array, data.c_str());
+
+  output(char_array);
+}
+
 
 void setup() {
   Serial.begin(115200);
+
+
 
  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
 
-  display.display();
-  delay(2000); // Pause for 2 seconds
-
-  // Clear the buffer
   display.clearDisplay();
 
-  // Draw a single pixel in white
-  display.drawPixel(10, 10, SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
 
-  // Show the display buffer on the screen. You MUST call display() after
-  // drawing commands to make them visible on screen!
-  display.display();
-  delay(2000);
+  unsigned tempSensorStatus = bme.begin(0x76);
+  if (!tempSensorStatus) {
+    Serial.println(F("Could not find a valid BMP280 sensor"));
+  }
 
-  display.invertDisplay(true);
-  delay(1000);
-  display.invertDisplay(false);
-  delay(1000);
-
+    /* Default settings from datasheet. */
+  bme.setSampling(Adafruit_BME280::MODE_NORMAL,     /* Operating Mode. */
+                  Adafruit_BME280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BME280::SAMPLING_X16); /* Standby time. */
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(NETWORK_SSID, NETWORK_PASS);
 
-  display.write("Connecting");
+  outputInfo("Connecting...", true);
   display.display();
-  Serial.print("Connecting");
+
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Connection Failed! Rebooting...");
+    outputInfo("Connection Failed! Rebooting...", true);
     delay(5000);
     ESP.restart();
   }
@@ -72,48 +129,73 @@ void setup() {
       type = "filesystem";
     }
 
-    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    Serial.println("Start updating " + type);
+    outputStringInfo("Start updating " + type);
   });
   ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
+    outputInfo("\nEnd");
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    int progressPercent = (int) (progress / (total / 100));
+    display.clearDisplay();
+    outputStringInfo("Progress: " + progressPercent);
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
+
+    outputInfo("Error: " + error);
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
+      outputInfo("Auth Failed");
     } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
+      outputInfo("Begin Failed");
     } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
+      outputInfo("Connect Failed");
     } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
+      outputInfo("Receive Failed");
     } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
+      outputInfo("End Failed");
     }
   });
 
   ArduinoOTA.begin();
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  display.clearDisplay();
 
+  outputInfo("WiFi connected", false);
+  outputInfo("IP address: ", false);
+  outputInfo(WiFi.localIP().toString().c_str(), false);
 
+  display.display();
 
-  pinMode(LED_BUILTIN, OUTPUT);
+  delay(5000);
+
+  //pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
   ArduinoOTA.handle();
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+   
+    display.setCursor(0, 0);
+    output("Temperature = ");
+    output(bme.readTemperature());
+    outputInfo(" *C", false);
 
-  digitalWrite(LED_BUILTIN, HIGH);   
-  delay(1000);                       
-  digitalWrite(LED_BUILTIN, LOW);    
-  delay(1000);  
-  Serial.print("*");                
+    // display.setCursor(0, 24);
+    // output("Pressure = ");
+    // output(bme.readPressure());
+    // outputInfo(" Pa");
+
+    display.setCursor(0, 24);
+    output("Humidity = ");
+    output(bme.readHumidity()); /* Adjusted to local forecast! */
+    outputInfo(" %", false);
+
+    outputInfo("", false); 
+
+
+    display.display();
+             
+    delay(1000);  
+
 }
