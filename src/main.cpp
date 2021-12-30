@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_BME280.h>
 #include <stdio.h>
+#include <PubSubClient.h>
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -20,7 +21,17 @@
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-Adafruit_BME280 bme; 
+Adafruit_BME280 bme;
+
+int loopIteration = 1;
+
+// MQTT Broker
+const char *mqtt_broker = "io.adafruit.com";
+const int mqtt_port = 1883;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+IPAddress server(172, 16, 0, 2);
 
 int drawX = 0;
 
@@ -75,6 +86,27 @@ void outputString(String data){
   output(char_array);
 }
 
+void mqttConnect(){
+      while (!client.connected()) {
+      String client_id = "temp-sensor-client-";
+      client_id += String(WiFi.macAddress());
+      display.clearDisplay();
+      Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
+      display.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
+      display.display();
+      delay(3000);
+
+      if (client.connect(client_id.c_str(), IO_USERNAME, IO_KEY)) {
+          outputInfo("Public mqtt broker connected");
+          delay(2000);
+
+      } else {
+          output("failed with state ");
+          output(client.state());
+          delay(2000);
+      }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -114,6 +146,12 @@ void setup() {
     ESP.restart();
   }
 
+  client.setServer(mqtt_broker, mqtt_port);
+
+  mqttConnect();
+
+  delay(3000);
+
   // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(OTA_HOSTNAME);
 
@@ -135,7 +173,6 @@ void setup() {
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     int progressPercent = (int) (progress / (total / 100));
-    display.clearDisplay();
     outputStringInfo("Progress: " + progressPercent);
   });
   ArduinoOTA.onError([](ota_error_t error) {
@@ -154,10 +191,12 @@ void setup() {
     }
   });
 
-  ArduinoOTA.begin();
+  ArduinoOTA.begin(true);
+
 
   display.clearDisplay();
 
+  display.setCursor(0,0);
   outputInfo("WiFi connected", false);
   outputInfo("IP address: ", false);
   outputInfo(WiFi.localIP().toString().c_str(), false);
@@ -171,13 +210,17 @@ void setup() {
 
 void loop() {
   ArduinoOTA.handle();
+  mqttConnect();
+
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
    
     display.setCursor(0, 0);
     output("Temperature = ");
-    output(bme.readTemperature());
+    char charsTemp[10];
+    sprintf(charsTemp, "%.2f", bme.readTemperature());
+    output(charsTemp);
     outputInfo("*C", false);
 
     // display.setCursor(0, 24);
@@ -187,14 +230,20 @@ void loop() {
 
     display.setCursor(0, 24);
     output("Humidity = ");
-    output(bme.readHumidity()); /* Adjusted to local forecast! */
+    char charsHumidity[10];
+    sprintf(charsHumidity, "%.2f", bme.readHumidity());
+    output(charsHumidity); 
     outputInfo("%", false);
 
     outputInfo("", false); 
-
-
     display.display();
-             
-    delay(1000);  
 
+    if(client.connected() && loopIteration % 12 == 0){
+      client.publish(TEMPERATURE_TOPIC, charsTemp);
+      client.publish(HUMIDITY_TOPIC, charsHumidity);
+      loopIteration = 0;
+    }
+
+    delay(5000);  
+    loopIteration++;
 }

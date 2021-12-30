@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../../../../PlatformIO/Projects/I2C Scanner"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"string": "cpp",
+			"*.tcc": "cpp",
+			"cstring": "cpp",
+			"string_view": "cpp",
+			"ostream": "cpp",
+			"stdexcept": "cpp",
+			"system_error": "cpp",
+			"typeinfo": "cpp",
+			"cmath": "cpp",
+			"array": "cpp",
+			"deque": "cpp",
+			"list": "cpp",
+			"unordered_map": "cpp",
+			"vector": "cpp",
+			"initializer_list": "cpp",
+			"ranges": "cpp"
+		}
+	}
+}
